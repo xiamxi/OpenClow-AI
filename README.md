@@ -10,46 +10,68 @@ Dieses Repository enthält eine vorkonfigurierte, token-kostenoptimierte OpenCla
 
 ### OpenClaw bereits installiert → Update-Skript
 
-Einmalig herunterladen und ausführen:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/xiamxi/OpenClow-AI/main/update.sh -o oc-update.sh
-chmod +x oc-update.sh
-./oc-update.sh
-```
-
 Das Skript:
 - erkennt automatisch den Konfigurationspfad (`~/.openclaw/` oder `~/.clawdbot/`)
-- erstellt ein Backup der bestehenden Config
+- legt vor jeder Änderung einen vollständigen Rollback-Snapshot an
 - patcht **nur** die Optimierungs-Schlüssel (API-Keys, Kanäle, eigene Agenten bleiben erhalten)
 - aktualisiert `AGENTS.md` und `HEARTBEAT.md` im Workspace
 - startet den Dienst neu (sofern systemd aktiv)
 
-Vorschau ohne Änderungen:
-```bash
-./oc-update.sh --dry-run
+#### Option A – Download via curl (wenn Repo auf GitHub veröffentlicht)
+
+Die Raw-URL hängt vom Branch-Namen ab. Schema:
+
+```
+https://raw.githubusercontent.com/<user>/<repo>/<branch>/update.sh
 ```
 
-Ohne Dienst-Neustart:
+Beispiel für dieses Repo:
+
 ```bash
-./oc-update.sh --no-restart
+curl -fsSL https://raw.githubusercontent.com/xiamxi/OpenClow-AI/claude/optimize-openclaw-vps-UUdKV/update.sh \
+     -o oc-update.sh
+chmod +x oc-update.sh
+./oc-update.sh
 ```
 
-Update rückgängig machen (letzter Snapshot):
+#### Option B – Direkt auf den VPS kopieren (empfohlen bei privatem Repo)
+
+Vom lokalen Rechner aus:
+
 ```bash
-./oc-update.sh --rollback
+scp update.sh user@<vps-ip>:~/oc-update.sh
 ```
 
-Bestimmten Snapshot wiederherstellen:
+Dann auf dem VPS:
+
 ```bash
-./oc-update.sh --list-rollbacks          # alle Snapshots anzeigen
-./oc-update.sh --rollback 20240218123456 # konkreten Snapshot wählen
+chmod +x oc-update.sh
+./oc-update.sh
 ```
 
-Rollback-Vorschau (ohne Änderungen):
+#### Option C – Via git clone
+
 ```bash
-./oc-update.sh --rollback --dry-run
+git clone https://github.com/xiamxi/OpenClow-AI.git
+cd OpenClow-AI
+git checkout claude/optimize-openclaw-vps-UUdKV
+chmod +x update.sh
+./update.sh
 ```
+
+---
+
+### Alle verfügbaren Befehle
+
+| Befehl | Funktion |
+|---|---|
+| `./oc-update.sh` | Update anwenden |
+| `./oc-update.sh --dry-run` | Vorschau – keine Änderungen |
+| `./oc-update.sh --no-restart` | Update ohne Dienst-Neustart |
+| `./oc-update.sh --rollback` | Letztes Update rückgängig machen |
+| `./oc-update.sh --rollback 20240218123456` | Bestimmten Snapshot wiederherstellen |
+| `./oc-update.sh --list-rollbacks` | Alle Snapshots mit Datum anzeigen |
+| `./oc-update.sh --rollback --dry-run` | Rollback-Vorschau ohne Änderungen |
 
 ---
 
