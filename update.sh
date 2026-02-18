@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================
-# OpenClaw Token-Optimierung – Update-Skript (v1.0)
+# OpenClaw Token-Optimierung – Update-Skript (v2.0)
 #
 # Dieses Skript patcht eine bereits installierte OpenClaw-
 # Instanz mit token-sparenden Einstellungen.
@@ -12,31 +12,244 @@
 #   chmod +x oc-update.sh && ./oc-update.sh
 #
 # Optionen:
-#   --dry-run    Zeigt geplante Änderungen, ohne sie zu schreiben
-#   --no-restart Dienst nach dem Update nicht neu starten
+#   --dry-run              Zeigt geplante Änderungen, ohne sie zu schreiben
+#   --no-restart           Dienst nach dem Update nicht neu starten
+#   --rollback             Letztes Update rückgängig machen
+#   --rollback <timestamp> Bestimmten Snapshot wiederherstellen
+#   --list-rollbacks       Alle verfügbaren Snapshots auflisten
 # ============================================================
 set -euo pipefail
 
 # ── Argumente ─────────────────────────────────────────────────────────────────
 DRY_RUN=false
 NO_RESTART=false
+MODE="update"           # update | rollback | list-rollbacks
+ROLLBACK_TS=""          # leer = neuester Snapshot
+
 for arg in "$@"; do
   case "$arg" in
-    --dry-run)    DRY_RUN=true ;;
-    --no-restart) NO_RESTART=true ;;
+    --dry-run)         DRY_RUN=true ;;
+    --no-restart)      NO_RESTART=true ;;
+    --list-rollbacks)  MODE="list-rollbacks" ;;
+    --rollback)        MODE="rollback" ;;
+    --rollback=*)      MODE="rollback"; ROLLBACK_TS="${arg#--rollback=}" ;;
+    [0-9]*)            ROLLBACK_TS="$arg" ;;   # Timestamp direkt nach --rollback
     *) echo "Unbekannte Option: $arg"; exit 1 ;;
   esac
 done
 
 # ── Farben ────────────────────────────────────────────────────────────────────
-GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; RESET='\033[0m'
-ok()   { echo -e "${GREEN}  ✓${RESET} $*"; }
-warn() { echo -e "${YELLOW}  !${RESET} $*"; }
-err()  { echo -e "${RED}  ✗${RESET} $*"; }
+GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; CYAN='\033[0;36m'; RESET='\033[0m'
+ok()    { echo -e "${GREEN}  ✓${RESET} $*"; }
+warn()  { echo -e "${YELLOW}  !${RESET} $*"; }
+err()   { echo -e "${RED}  ✗${RESET} $*"; }
+info()  { echo -e "${CYAN}  →${RESET} $*"; }
 
+# ── Hilfsfunktionen ───────────────────────────────────────────────────────────
+
+# Konfigurationspfad ermitteln (auch für Rollback benötigt)
+find_config() {
+  local candidates=(
+    "$HOME/.openclaw/openclaw.json"
+    "$HOME/.clawdbot/clawdbot.json"
+  )
+  for c in "${candidates[@]}"; do
+    if [[ -f "$c" ]]; then echo "$c"; return; fi
+  done
+  # Beim Rollback: Verzeichnis aus dem Manifest nehmen
+  echo ""
+}
+
+# Dienst neu starten
+restart_service() {
+  if $NO_RESTART; then
+    warn "Dienst-Neustart übersprungen (--no-restart)."
+    warn "Bitte manuell neu starten: openclaw stop && openclaw start"
+    return
+  fi
+  info "OpenClaw-Dienst neu starten..."
+  if systemctl is-active --quiet openclaw 2>/dev/null; then
+    sudo systemctl restart openclaw
+    ok "Dienst 'openclaw' neu gestartet"
+  elif systemctl is-active --quiet clawdbot 2>/dev/null; then
+    sudo systemctl restart clawdbot
+    ok "Dienst 'clawdbot' neu gestartet"
+  else
+    warn "Kein aktiver systemd-Dienst – bitte OpenClaw manuell neu starten."
+    warn "  openclaw stop && openclaw start"
+  fi
+}
+
+# ══════════════════════════════════════════════════════════════
+#  MODUS: --list-rollbacks
+# ══════════════════════════════════════════════════════════════
+if [[ "$MODE" == "list-rollbacks" ]]; then
+  CONFIG_PATH="$(find_config)"
+  CONFIG_DIR="${CONFIG_PATH:+$(dirname "$CONFIG_PATH")}"
+  ROLLBACK_BASE="${CONFIG_DIR:-$HOME/.openclaw}/.rollback"
+
+  echo ""
+  echo "════════════════════════════════════════════════════════════"
+  echo " OpenClaw – verfügbare Rollback-Snapshots"
+  echo "════════════════════════════════════════════════════════════"
+  echo ""
+
+  if [[ ! -d "$ROLLBACK_BASE" ]] || [[ -z "$(ls -A "$ROLLBACK_BASE" 2>/dev/null)" ]]; then
+    warn "Keine Snapshots gefunden in: $ROLLBACK_BASE"
+    echo ""
+    exit 0
+  fi
+
+  i=1
+  for dir in $(ls -r "$ROLLBACK_BASE"); do
+    manifest="$ROLLBACK_BASE/$dir/manifest.json"
+    if [[ ! -f "$manifest" ]]; then continue; fi
+    ts_human=$(python3 -c "
+import json, datetime
+m = json.load(open('$manifest'))
+dt = datetime.datetime.fromisoformat(m['timestamp'])
+print(dt.strftime('%d.%m.%Y %H:%M:%S'))
+" 2>/dev/null || echo "$dir")
+    files=$(python3 -c "
+import json
+m = json.load(open('$manifest'))
+lines = []
+for f in m['files']:
+    action = {'modified':'geändert','created':'neu erstellt'}.get(f['action'], f['action'])
+    lines.append(f\"  {f['target'].split('/')[-1]} ({action})\")
+print('\n'.join(lines))
+" 2>/dev/null || echo "  (Details nicht lesbar)")
+
+    marker=""
+    if [[ $i -eq 1 ]]; then marker=" ${GREEN}← neuester${RESET}"; fi
+    echo -e " ${CYAN}[$i]${RESET} Snapshot: ${YELLOW}$dir${RESET}${marker}"
+    echo "     Datum:    $ts_human"
+    echo "     Dateien:"
+    echo "$files"
+    echo ""
+    echo "     Rückgängig machen mit:"
+    echo "       ./oc-update.sh --rollback $dir"
+    echo ""
+    ((i++))
+  done
+
+  echo "════════════════════════════════════════════════════════════"
+  echo ""
+  exit 0
+fi
+
+# ══════════════════════════════════════════════════════════════
+#  MODUS: --rollback
+# ══════════════════════════════════════════════════════════════
+if [[ "$MODE" == "rollback" ]]; then
+  CONFIG_PATH="$(find_config)"
+  CONFIG_DIR="${CONFIG_PATH:+$(dirname "$CONFIG_PATH")}"
+  ROLLBACK_BASE="${CONFIG_DIR:-$HOME/.openclaw}/.rollback"
+
+  echo ""
+  echo "════════════════════════════════════════════════════════════"
+  echo " OpenClaw – Rollback"
+  if $DRY_RUN; then echo -e " ${YELLOW}[DRY-RUN]${RESET}"; fi
+  echo "════════════════════════════════════════════════════════════"
+  echo ""
+
+  if [[ ! -d "$ROLLBACK_BASE" ]]; then
+    err "Kein Rollback-Verzeichnis gefunden: $ROLLBACK_BASE"
+    exit 1
+  fi
+
+  # Snapshot auswählen
+  if [[ -z "$ROLLBACK_TS" ]]; then
+    ROLLBACK_TS=$(ls -r "$ROLLBACK_BASE" 2>/dev/null | head -1)
+    if [[ -z "$ROLLBACK_TS" ]]; then
+      err "Keine Snapshots vorhanden."
+      exit 1
+    fi
+    info "Neuesten Snapshot ausgewählt: $ROLLBACK_TS"
+  fi
+
+  SNAPSHOT_DIR="$ROLLBACK_BASE/$ROLLBACK_TS"
+  MANIFEST="$SNAPSHOT_DIR/manifest.json"
+
+  if [[ ! -f "$MANIFEST" ]]; then
+    err "Snapshot nicht gefunden: $SNAPSHOT_DIR"
+    err "Verfügbare Snapshots: ./oc-update.sh --list-rollbacks"
+    exit 1
+  fi
+
+  ok "Snapshot gefunden: $ROLLBACK_TS"
+
+  # Manifest einlesen und Dateien wiederherstellen
+  python3 - "$MANIFEST" "$SNAPSHOT_DIR" "$DRY_RUN" <<'ROLLBACK_PY'
+import json, shutil, sys, os
+
+manifest_path = sys.argv[1]
+snapshot_dir  = sys.argv[2]
+dry_run       = sys.argv[3] == "true"
+
+with open(manifest_path, "r") as f:
+    manifest = json.load(f)
+
+print(f"  Timestamp: {manifest['timestamp']}")
+print("")
+
+for entry in manifest["files"]:
+    target  = entry["target"]
+    action  = entry["action"]
+    backup  = entry.get("backup")   # relativer Pfad im Snapshot, oder None
+
+    if action == "modified":
+        # Datei existierte vor dem Update → Original wiederherstellen
+        src = os.path.join(snapshot_dir, backup)
+        if not os.path.isfile(src):
+            print(f"  ✗ Backup fehlt: {src}")
+            sys.exit(1)
+        if dry_run:
+            print(f"  [DRY] Wiederherstellen: {target}")
+        else:
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            shutil.copy2(src, target)
+            print(f"  ✓ Wiederhergestellt: {target}")
+
+    elif action == "created":
+        # Datei wurde neu erstellt → löschen
+        if dry_run:
+            print(f"  [DRY] Löschen (war nicht vorhanden): {target}")
+        else:
+            if os.path.isfile(target):
+                os.remove(target)
+                print(f"  ✓ Gelöscht (war nicht vorhanden): {target}")
+            else:
+                print(f"  - Bereits nicht vorhanden: {target}")
+
+print("")
+if not dry_run:
+    print("ROLLBACK_OK")
+ROLLBACK_PY
+
+  if ! $DRY_RUN; then
+    restart_service
+    echo ""
+    echo "════════════════════════════════════════════════════════════"
+    echo -e " ${GREEN}Rollback erfolgreich!${RESET}"
+    echo " Snapshot $ROLLBACK_TS wurde wiederhergestellt."
+    echo "════════════════════════════════════════════════════════════"
+    echo ""
+  else
+    echo ""
+    warn "DRY-RUN beendet. Zum echten Rollback ohne --dry-run ausführen:"
+    echo "  ./oc-update.sh --rollback $ROLLBACK_TS"
+    echo ""
+  fi
+  exit 0
+fi
+
+# ══════════════════════════════════════════════════════════════
+#  MODUS: update (Standard)
+# ══════════════════════════════════════════════════════════════
 echo ""
 echo "════════════════════════════════════════════════════════════"
-echo " OpenClaw Token-Optimierung – Update"
+echo " OpenClaw Token-Optimierung – Update (v2.0)"
 if $DRY_RUN; then echo -e " ${YELLOW}[DRY-RUN – keine Dateien werden geschrieben]${RESET}"; fi
 echo "════════════════════════════════════════════════════════════"
 echo ""
@@ -48,42 +261,91 @@ if ! command -v python3 &>/dev/null; then
 fi
 
 # ── Konfigurationspfad ermitteln ──────────────────────────────────────────────
-CONFIG_CANDIDATES=(
-  "$HOME/.openclaw/openclaw.json"
-  "$HOME/.clawdbot/clawdbot.json"
-)
-CONFIG_PATH=""
-for c in "${CONFIG_CANDIDATES[@]}"; do
-  if [[ -f "$c" ]]; then
-    CONFIG_PATH="$c"
-    break
-  fi
-done
-
+CONFIG_PATH="$(find_config)"
 if [[ -z "$CONFIG_PATH" ]]; then
   err "Keine OpenClaw-Konfiguration gefunden."
-  err "Gesucht in: ${CONFIG_CANDIDATES[*]}"
+  err "Gesucht in: ~/.openclaw/openclaw.json  ~/.clawdbot/clawdbot.json"
   exit 1
 fi
 ok "Konfiguration gefunden: $CONFIG_PATH"
 
-# Workspace-Verzeichnis (parallel zur Config)
 CONFIG_DIR="$(dirname "$CONFIG_PATH")"
 WORKSPACE_DIR="$CONFIG_DIR/workspace"
+ROLLBACK_BASE="$CONFIG_DIR/.rollback"
+TIMESTAMP="$(date +%Y%m%d%H%M%S)"
+SNAPSHOT_DIR="$ROLLBACK_BASE/$TIMESTAMP"
 
-# ── Backup ───────────────────────────────────────────────────────────────────
-BACKUP="$CONFIG_PATH.bak.$(date +%Y%m%d%H%M%S)"
-if ! $DRY_RUN; then
-  cp "$CONFIG_PATH" "$BACKUP"
-  ok "Backup erstellt: $BACKUP"
+# ── Rollback-Snapshot anlegen ─────────────────────────────────────────────────
+# Vor jeder Änderung: Originalzustand aller betroffenen Dateien sichern.
+# Das Manifest dokumentiert für jede Datei:
+#   "modified" → Original-Backup liegt im Snapshot → wird bei Rollback wiederhergestellt
+#   "created"  → Datei existierte vorher nicht     → wird bei Rollback gelöscht
+
+AGENTS_TARGET="$WORKSPACE_DIR/AGENTS.md"
+HEARTBEAT_TARGET="$WORKSPACE_DIR/HEARTBEAT.md"
+
+build_manifest() {
+  local config_existed=true   # Config muss existieren (oben geprüft)
+  local agents_existed=false
+  local heartbeat_existed=false
+
+  [[ -f "$AGENTS_TARGET"    ]] && agents_existed=true
+  [[ -f "$HEARTBEAT_TARGET" ]] && heartbeat_existed=true
+
+  # Manifest-JSON bauen
+  python3 - <<MANIFEST_PY
+import json
+
+entries = []
+
+# Config wurde immer modifiziert
+entries.append({
+    "target": "$CONFIG_PATH",
+    "action": "modified",
+    "backup": "openclaw.json"
+})
+
+# AGENTS.md
+if $agents_existed:
+    entries.append({"target": "$AGENTS_TARGET", "action": "modified", "backup": "AGENTS.md"})
+else:
+    entries.append({"target": "$AGENTS_TARGET", "action": "created",  "backup": None})
+
+# HEARTBEAT.md
+if $heartbeat_existed:
+    entries.append({"target": "$HEARTBEAT_TARGET", "action": "modified", "backup": "HEARTBEAT.md"})
+else:
+    entries.append({"target": "$HEARTBEAT_TARGET", "action": "created",  "backup": None})
+
+import datetime
+manifest = {
+    "timestamp": datetime.datetime.now().isoformat(timespec="seconds"),
+    "version":   "2.0",
+    "files":     entries
+}
+print(json.dumps(manifest, indent=2, ensure_ascii=False))
+MANIFEST_PY
+}
+
+if $DRY_RUN; then
+  warn "DRY-RUN: Snapshot würde erstellt werden in: $SNAPSHOT_DIR"
 else
-  warn "DRY-RUN: Backup würde erstellt werden: $BACKUP"
+  mkdir -p "$SNAPSHOT_DIR"
+
+  # Config sichern
+  cp "$CONFIG_PATH" "$SNAPSHOT_DIR/openclaw.json"
+
+  # AGENTS.md sichern, falls vorhanden
+  [[ -f "$AGENTS_TARGET"    ]] && cp "$AGENTS_TARGET"    "$SNAPSHOT_DIR/AGENTS.md"
+  [[ -f "$HEARTBEAT_TARGET" ]] && cp "$HEARTBEAT_TARGET" "$SNAPSHOT_DIR/HEARTBEAT.md"
+
+  # Manifest schreiben
+  build_manifest > "$SNAPSHOT_DIR/manifest.json"
+
+  ok "Rollback-Snapshot erstellt: $SNAPSHOT_DIR"
 fi
 
 # ── JSON-Patch (via Python3) ──────────────────────────────────────────────────
-# Der Patch merged nur Optimierungs-Schlüssel; alles andere (API-Keys,
-# Kanäle, eigene Agenten) bleibt unangetastet.
-
 PATCH_JSON='{
   "agents": {
     "defaults": {
@@ -135,24 +397,19 @@ PATCH_JSON='{
   }
 }'
 
-PYTHON_SCRIPT='
+PYTHON_PATCH='
 import json, re, sys
 
 def strip_comments(text):
-    """Entfernt // Kommentare aus JSON-ähnlichem Text."""
     lines = []
     for line in text.splitlines():
         stripped = re.sub(r"\s*//.*$", "", line)
         lines.append(stripped)
-    # Trailing commas vor } oder ] entfernen
     text = "\n".join(lines)
     text = re.sub(r",(\s*[}\]])", r"\1", text)
     return text
 
 def deep_merge(base, patch):
-    """Merged patch in base. Existierende Werte werden nur überschrieben,
-    wenn der Patch-Key auf der gleichen Ebene definiert ist.
-    Listen werden vollständig ersetzt (nicht erweitert)."""
     result = dict(base)
     for key, val in patch.items():
         if key in result and isinstance(result[key], dict) and isinstance(val, dict):
@@ -173,9 +430,8 @@ try:
 except json.JSONDecodeError:
     current = json.loads(strip_comments(raw))
 
-patch = json.loads(patch_json)
+patch  = json.loads(patch_json)
 merged = deep_merge(current, patch)
-
 output = json.dumps(merged, indent=2, ensure_ascii=False)
 
 if dry_run:
@@ -187,31 +443,24 @@ else:
     print("OK")
 '
 
-echo "--> Konfiguration patchen..."
-RESULT=$(python3 - "$CONFIG_PATH" "$PATCH_JSON" "$DRY_RUN" <<< "$PYTHON_SCRIPT")
+info "Konfiguration patchen..."
+RESULT=$(python3 - "$CONFIG_PATH" "$PATCH_JSON" "$DRY_RUN" <<< "$PYTHON_PATCH")
 
 if $DRY_RUN; then
   echo ""
   echo "$RESULT"
   echo ""
-  warn "DRY-RUN beendet. Zum echten Patchen ohne --dry-run ausführen."
+  warn "DRY-RUN beendet. Zum echten Update ohne --dry-run ausführen."
   exit 0
 fi
 
-if [[ "$RESULT" == "OK" ]]; then
-  ok "openclaw.json erfolgreich gepatcht"
-else
-  err "Fehler beim Patchen der Konfiguration"
-  echo "$RESULT"
-  exit 1
-fi
+[[ "$RESULT" == "OK" ]] && ok "openclaw.json erfolgreich gepatcht" || { err "Fehler beim Patchen"; echo "$RESULT"; exit 1; }
 
 # ── Workspace-Dateien schreiben ───────────────────────────────────────────────
 mkdir -p "$WORKSPACE_DIR"
-echo "--> Workspace-Dateien aktualisieren..."
+info "Workspace-Dateien aktualisieren..."
 
-# AGENTS.md
-cat > "$WORKSPACE_DIR/AGENTS.md" <<'AGENTS_EOF'
+cat > "$AGENTS_TARGET" <<'AGENTS_EOF'
 # AGENTS – Modell-Routing & Verhaltensregeln
 
 ## Modell-Auswahl (Token-Kostenoptimierung)
@@ -245,10 +494,9 @@ Nutze grundsätzlich das günstigste Modell, das für die jeweilige Aufgabe ausr
 - Bilder nur senden, wenn sie für die Aufgabe notwendig sind.
 - Große Dateien in kleinere Chunks aufteilen, statt alles auf einmal zu übergeben.
 AGENTS_EOF
-ok "AGENTS.md → $WORKSPACE_DIR/AGENTS.md"
+ok "AGENTS.md → $AGENTS_TARGET"
 
-# HEARTBEAT.md
-cat > "$WORKSPACE_DIR/HEARTBEAT.md" <<'HEARTBEAT_EOF'
+cat > "$HEARTBEAT_TARGET" <<'HEARTBEAT_EOF'
 # HEARTBEAT – Minimale Aktionen
 
 Dieser Heartbeat läuft alle 55 Minuten mit einem günstigen Modell (Haiku oder lokal).
@@ -265,25 +513,10 @@ Dieser Heartbeat läuft alle 55 Minuten mit einem günstigen Modell (Haiku oder 
 - Keine langen Erklärungen, keine Listen, kein Smalltalk.
 - `NO_REPLY` = kein Token-Output = minimale Kosten.
 HEARTBEAT_EOF
-ok "HEARTBEAT.md → $WORKSPACE_DIR/HEARTBEAT.md"
+ok "HEARTBEAT.md → $HEARTBEAT_TARGET"
 
 # ── Dienst neu starten ────────────────────────────────────────────────────────
-if ! $NO_RESTART; then
-  echo "--> OpenClaw-Dienst neu starten..."
-  if systemctl is-active --quiet openclaw 2>/dev/null; then
-    sudo systemctl restart openclaw
-    ok "Dienst 'openclaw' neu gestartet"
-  elif systemctl is-active --quiet clawdbot 2>/dev/null; then
-    sudo systemctl restart clawdbot
-    ok "Dienst 'clawdbot' neu gestartet"
-  else
-    warn "Kein aktiver systemd-Dienst gefunden – bitte OpenClaw manuell neu starten."
-    warn "  openclaw stop && openclaw start"
-  fi
-else
-  warn "Dienst-Neustart übersprungen (--no-restart)."
-  warn "Bitte manuell neu starten: openclaw stop && openclaw start"
-fi
+restart_service
 
 # ── Zusammenfassung ───────────────────────────────────────────────────────────
 echo ""
@@ -300,9 +533,15 @@ echo "   • Bilder           max 800px (weniger Vision-Tokens)"
 echo "   • Bootstrap        8.000 / 40.000 Zeichen Limit"
 echo "   • Sicherheit       bind: loopback (Gateway nicht öffentlich)"
 echo ""
-echo " Backup der alten Config: $BACKUP"
+echo " Rollback-Snapshot: $TIMESTAMP"
 echo ""
-echo " Nützliche Chat-Befehle nach dem Neustart:"
+echo -e " ${YELLOW}Update rückgängig machen:${RESET}"
+echo "   ./oc-update.sh --rollback"
+echo ""
+echo " Alle Snapshots anzeigen:"
+echo "   ./oc-update.sh --list-rollbacks"
+echo ""
+echo " Nützliche Chat-Befehle:"
 echo "   /status          Modell & Kontext-Füllstand"
 echo "   /usage tokens    Token-Zähler einblenden"
 echo "   /model haiku     Auf Haiku wechseln (= P1:)"

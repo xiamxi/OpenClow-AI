@@ -35,6 +35,22 @@ Ohne Dienst-Neustart:
 ./oc-update.sh --no-restart
 ```
 
+Update rückgängig machen (letzter Snapshot):
+```bash
+./oc-update.sh --rollback
+```
+
+Bestimmten Snapshot wiederherstellen:
+```bash
+./oc-update.sh --list-rollbacks          # alle Snapshots anzeigen
+./oc-update.sh --rollback 20240218123456 # konkreten Snapshot wählen
+```
+
+Rollback-Vorschau (ohne Änderungen):
+```bash
+./oc-update.sh --rollback --dry-run
+```
+
 ---
 
 ### Neue Installation → Setup-Skript
