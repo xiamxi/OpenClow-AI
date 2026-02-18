@@ -11,12 +11,11 @@ Nutze grundsätzlich das günstigste Modell, das für die jeweilige Aufgabe ausr
 | Architekturentscheidungen, Sicherheitsanalyse    | Sonnet     | `/model sonnet` |
 | Komplexes Debugging, tiefes Reasoning, Strategie | Opus       | `/model opus`   |
 
-**Faustregel:** Beginne immer mit Haiku. Nur wenn die Antwort unzureichend ist, wechsle zu Sonnet.
-Opus nur auf explizite Anfrage oder bei nachweislich hochkomplexen Aufgaben.
+**Faustregel:** Beginne immer mit Haiku. Nur wenn die Antwort unzureichend ist, wechsle zu Sonnet, ansonsten kannst du dich auch an die Aufforderung des Users orientieren. Wenn der User am "P1:" dann bedeutet das nutze Haiku, bei "P2:" nutzt du dann Sonnet und bei "P3:" nutzt du Opus.
 
 ## Session-Management (Kontext-Kosten senken)
 
-- Nach jeder abgeschlossenen Aufgabe: `/reset` ausführen, um die Session zu bereinigen.
+- Nach jeder abgeschlossenen Aufgabe den user fragen, ob ein `/reset` ausgeführt werden soll, um die Session zu bereinigen.
 - Vor einer neuen, unabhängigen Aufgabe: neue Session starten (`/new`).
 - Mit `/status` den aktuellen Kontext-Füllstand überwachen.
 - Mit `/usage tokens` Token-Verbrauch pro Antwort einblenden.
