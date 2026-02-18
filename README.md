@@ -8,16 +8,42 @@ Dieses Repository enthält eine vorkonfigurierte, token-kostenoptimierte OpenCla
 
 ## Schnellstart
 
+### OpenClaw bereits installiert → Update-Skript
+
+Einmalig herunterladen und ausführen:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xiamxi/OpenClow-AI/main/update.sh -o oc-update.sh
+chmod +x oc-update.sh
+./oc-update.sh
+```
+
+Das Skript:
+- erkennt automatisch den Konfigurationspfad (`~/.openclaw/` oder `~/.clawdbot/`)
+- erstellt ein Backup der bestehenden Config
+- patcht **nur** die Optimierungs-Schlüssel (API-Keys, Kanäle, eigene Agenten bleiben erhalten)
+- aktualisiert `AGENTS.md` und `HEARTBEAT.md` im Workspace
+- startet den Dienst neu (sofern systemd aktiv)
+
+Vorschau ohne Änderungen:
+```bash
+./oc-update.sh --dry-run
+```
+
+Ohne Dienst-Neustart:
+```bash
+./oc-update.sh --no-restart
+```
+
+---
+
+### Neue Installation → Setup-Skript
+
 ```bash
 git clone <dieses-repo>
 cd OpenClow-AI
 chmod +x setup.sh
 ./setup.sh
-```
-
-Dann API-Schlüssel eintragen und starten:
-
-```bash
 openclaw config set anthropic.apiKey sk-ant-...
 sudo systemctl start openclaw
 ```
