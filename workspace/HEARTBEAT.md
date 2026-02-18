@@ -1,6 +1,6 @@
 # HEARTBEAT – Minimale Aktionen
 
-Dieser Heartbeat läuft alle 55 Minuten mit einem günstigen Modell (Haiku oder lokal).
+Dieser Heartbeat läuft alle 6 Stunden (08:00, 14:00, 20:00 Uhr) mit einem günstigen Modell (Haiku oder lokal).
 
 ## Aufgaben (nur wenn notwendig)
 
@@ -10,6 +10,6 @@ Dieser Heartbeat läuft alle 55 Minuten mit einem günstigen Modell (Haiku oder 
 
 ## Wichtig
 
-- Halte die Antwort unter 200 Zeichen.
+- Halte die Antwort unter 1000 Zeichen.
 - Keine langen Erklärungen, keine Listen, kein Smalltalk.
 - `NO_REPLY` = kein Token-Output = minimale Kosten.

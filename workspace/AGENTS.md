@@ -4,14 +4,14 @@
 
 Nutze grundsätzlich das günstigste Modell, das für die jeweilige Aufgabe ausreicht.
 
-| Aufgabe                                          | Modell     | Befehl      |
-|--------------------------------------------------|------------|-------------|
-| Einfache Fragen, Suche, Dateioperationen         | Haiku      | `/model haiku`  |
-| Normale Konversation, Code, Erklärungen          | Sonnet     | `/model sonnet` |
-| Architekturentscheidungen, Sicherheitsanalyse    | Sonnet     | `/model sonnet` |
-| Komplexes Debugging, tiefes Reasoning, Strategie | Opus       | `/model opus`   |
+| Aufgabe                                          | Modell            | Prefix | Befehl          |
+|--------------------------------------------------|-------------------|--------|-----------------|
+| Einfache Fragen, Suche, Dateioperationen         | Haiku 4.5         | `P1:`  | `/model haiku`  |
+| Normale Konversation, Code, Erklärungen          | Sonnet 4.6        | `P2:`  | `/model sonnet` |
+| Architekturentscheidungen, Sicherheitsanalyse    | Sonnet 4.6        | `P2:`  | `/model sonnet` |
+| Komplexes Debugging, tiefes Reasoning, Strategie | Opus 4.6          | `P3:`  | `/model opus`   |
 
-**Faustregel:** Beginne immer mit Haiku. Nur wenn die Antwort unzureichend ist, wechsle zu Sonnet, ansonsten kannst du dich auch an die Aufforderung des Users orientieren. Wenn der User am "P1:" dann bedeutet das nutze Haiku, bei "P2:" nutzt du dann Sonnet und bei "P3:" nutzt du Opus.
+**Faustregel:** Das Standard-Modell ist **Haiku 4.5 (P1:)**. Beginne immer damit. Schreibt der User `P2:` am Anfang seiner Nachricht, nutze **Sonnet 4.6**. Schreibt der User `P3:`, nutze **Opus 4.6**. Mit `P1:` kehrst du zu **Haiku 4.5** zurück.
 
 ## Session-Management (Kontext-Kosten senken)
 

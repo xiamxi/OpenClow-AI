@@ -351,15 +351,15 @@ PATCH_JSON='{
   "agents": {
     "defaults": {
       "model": {
-        "primary": "anthropic/claude-sonnet-4-5",
+        "primary": "anthropic/claude-haiku-4-5",
         "fallbacks": [
-          "anthropic/claude-haiku-4-5",
+          "anthropic/claude-sonnet-4-6",
           "openrouter/openrouter/auto"
         ]
       },
       "models": {
         "anthropic/claude-haiku-4-5":  { "alias": "haiku"  },
-        "anthropic/claude-sonnet-4-5": { "alias": "sonnet" },
+        "anthropic/claude-sonnet-4-6": { "alias": "sonnet" },
         "anthropic/claude-opus-4-6":   { "alias": "opus"   }
       },
       "contextPruning": {
@@ -377,10 +377,10 @@ PATCH_JSON='{
         }
       },
       "heartbeat": {
-        "every": "55m",
+        "every": "6h",
         "model": "anthropic/claude-haiku-4-5",
         "includeReasoning": false,
-        "ackMaxChars": 200,
+        "ackMaxChars": 1000,
         "suppressToolErrorWarnings": true,
         "prompt": "Lies HEARTBEAT.md, falls vorhanden. Fuehre nur aus, was dort steht. Antworte mit NO_REPLY, wenn keine Aktion noetig."
       },
@@ -467,14 +467,14 @@ cat > "$AGENTS_TARGET" <<'AGENTS_EOF'
 
 Nutze grundsätzlich das günstigste Modell, das für die jeweilige Aufgabe ausreicht.
 
-| Aufgabe                                          | Modell     | Befehl      |
-|--------------------------------------------------|------------|-------------|
-| Einfache Fragen, Suche, Dateioperationen         | Haiku      | `/model haiku`  |
-| Normale Konversation, Code, Erklärungen          | Sonnet     | `/model sonnet` |
-| Architekturentscheidungen, Sicherheitsanalyse    | Sonnet     | `/model sonnet` |
-| Komplexes Debugging, tiefes Reasoning, Strategie | Opus       | `/model opus`   |
+| Aufgabe                                          | Modell            | Prefix | Befehl          |
+|--------------------------------------------------|-------------------|--------|-----------------|
+| Einfache Fragen, Suche, Dateioperationen         | Haiku 4.5         | `P1:`  | `/model haiku`  |
+| Normale Konversation, Code, Erklärungen          | Sonnet 4.6        | `P2:`  | `/model sonnet` |
+| Architekturentscheidungen, Sicherheitsanalyse    | Sonnet 4.6        | `P2:`  | `/model sonnet` |
+| Komplexes Debugging, tiefes Reasoning, Strategie | Opus 4.6          | `P3:`  | `/model opus`   |
 
-**Faustregel:** Beginne immer mit Haiku. Nur wenn die Antwort unzureichend ist, wechsle zu Sonnet, ansonsten kannst du dich auch an die Aufforderung des Users orientieren. Wenn der User am "P1:" dann bedeutet das nutze Haiku, bei "P2:" nutzt du dann Sonnet und bei "P3:" nutzt du Opus.
+**Faustregel:** Das Standard-Modell ist **Haiku 4.5 (P1:)**. Beginne immer damit. Schreibt der User `P2:` am Anfang seiner Nachricht, nutze **Sonnet 4.6**. Schreibt der User `P3:`, nutze **Opus 4.6**. Mit `P1:` kehrst du zu **Haiku 4.5** zurück.
 
 ## Session-Management (Kontext-Kosten senken)
 
@@ -499,7 +499,7 @@ ok "AGENTS.md → $AGENTS_TARGET"
 cat > "$HEARTBEAT_TARGET" <<'HEARTBEAT_EOF'
 # HEARTBEAT – Minimale Aktionen
 
-Dieser Heartbeat läuft alle 55 Minuten mit einem günstigen Modell (Haiku oder lokal).
+Dieser Heartbeat läuft alle 6 Stunden (08:00, 14:00, 20:00 Uhr) mit einem günstigen Modell (Haiku oder lokal).
 
 ## Aufgaben (nur wenn notwendig)
 
@@ -509,7 +509,7 @@ Dieser Heartbeat läuft alle 55 Minuten mit einem günstigen Modell (Haiku oder 
 
 ## Wichtig
 
-- Halte die Antwort unter 200 Zeichen.
+- Halte die Antwort unter 1000 Zeichen.
 - Keine langen Erklärungen, keine Listen, kein Smalltalk.
 - `NO_REPLY` = kein Token-Output = minimale Kosten.
 HEARTBEAT_EOF
@@ -524,9 +524,9 @@ echo "════════════════════════�
 echo -e " ${GREEN}Update erfolgreich!${RESET}"
 echo ""
 echo " Angewendete Optimierungen:"
-echo "   • Model-Routing   Sonnet (Standard) → Haiku (Fallback)"
-echo "   • P1/P2/P3-Prefix Haiku / Sonnet / Opus per Chat-Befehl"
-echo "   • Heartbeat        Haiku, 55min, max 200 Zeichen Antwort"
+echo "   • Model-Routing   Haiku 4.5 (Standard/P1:) · Sonnet 4.6 (P2:) · Opus 4.6 (P3:)"
+echo "   • P1/P2/P3-Prefix Haiku 4.5 / Sonnet 4.6 / Opus 4.6 per Chat-Befehl"
+echo "   • Heartbeat        Haiku, alle 6h (08–24 Uhr), max 1000 Zeichen Antwort"
 echo "   • Context-Pruning  cache-ttl 1h → 40–60% weniger Tokens"
 echo "   • Compaction       safeguard-Modus mit memoryFlush"
 echo "   • Bootstrap        8.000 / 40.000 Zeichen Limit"
@@ -543,8 +543,8 @@ echo ""
 echo " Nützliche Chat-Befehle:"
 echo "   /status          Modell & Kontext-Füllstand"
 echo "   /usage tokens    Token-Zähler einblenden"
-echo "   /model haiku     Auf Haiku wechseln (= P1:)"
-echo "   /model sonnet    Auf Sonnet wechseln (= P2:)"
-echo "   /model opus      Auf Opus wechseln (= P3:)"
+echo "   /model haiku     Auf Haiku 4.5 wechseln  (= P1: Standard)"
+echo "   /model sonnet    Auf Sonnet 4.6 wechseln (= P2:)"
+echo "   /model opus      Auf Opus 4.6 wechseln   (= P3:)"
 echo "════════════════════════════════════════════════════════════"
 echo ""
