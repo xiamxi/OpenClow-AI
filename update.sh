@@ -60,23 +60,24 @@ find_config() {
   echo ""
 }
 
-# Dienst neu starten
+# Gateway neu starten
 restart_service() {
   if $NO_RESTART; then
-    warn "Dienst-Neustart übersprungen (--no-restart)."
-    warn "Bitte manuell neu starten: openclaw stop && openclaw start"
+    warn "Gateway-Neustart übersprungen (--no-restart)."
+    warn "Bitte manuell neu starten: openclaw gateway restart"
     return
   fi
-  info "OpenClaw-Dienst neu starten..."
-  if systemctl is-active --quiet openclaw 2>/dev/null; then
-    sudo systemctl restart openclaw
-    ok "Dienst 'openclaw' neu gestartet"
-  elif systemctl is-active --quiet clawdbot 2>/dev/null; then
-    sudo systemctl restart clawdbot
-    ok "Dienst 'clawdbot' neu gestartet"
+  info "OpenClaw-Gateway neu starten..."
+  if command -v openclaw &>/dev/null; then
+    if openclaw gateway restart 2>/dev/null; then
+      ok "Gateway neu gestartet (openclaw gateway restart)"
+    else
+      warn "Gateway-Neustart fehlgeschlagen – bitte manuell ausführen:"
+      warn "  openclaw gateway restart"
+    fi
   else
-    warn "Kein aktiver systemd-Dienst – bitte OpenClaw manuell neu starten."
-    warn "  openclaw stop && openclaw start"
+    warn "openclaw CLI nicht gefunden – bitte manuell neu starten:"
+    warn "  openclaw gateway restart"
   fi
 }
 
@@ -528,7 +529,6 @@ echo "   • P1/P2/P3-Prefix Haiku / Sonnet / Opus per Chat-Befehl"
 echo "   • Heartbeat        Haiku, 55min, max 200 Zeichen Antwort"
 echo "   • Context-Pruning  cache-ttl 1h → 40–60% weniger Tokens"
 echo "   • Compaction       safeguard-Modus mit memoryFlush"
-echo "   • Bilder           max 800px (weniger Vision-Tokens)"
 echo "   • Bootstrap        8.000 / 40.000 Zeichen Limit"
 echo "   • Sicherheit       bind: loopback (Gateway nicht öffentlich)"
 echo ""
