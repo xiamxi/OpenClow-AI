@@ -61,6 +61,19 @@ chmod +x update.sh
 
 ---
 
+### Bei Fehler nach dem Update (Rollback)
+
+Falls `openclaw gateway restart` einen Config-Fehler meldet, einfach den Snapshot wiederherstellen:
+
+```bash
+./oc-update.sh --rollback
+openclaw gateway restart
+```
+
+Dann die neue Version des Skripts herunterladen und erneut ausführen.
+
+---
+
 ### Alle verfügbaren Befehle
 
 | Befehl | Funktion |
@@ -126,15 +139,7 @@ Alternativ: lokales Ollama-Modell → 0 Tokenkosten.
 
 Der 55-Minuten-Rhythmus hält den Cache warm (Cache-TTL meist 1h) und verhindert teure Re-Caching-Kosten.
 
-### 4. Kleinere Bilder (spart 10–30 % bei visuellen Aufgaben)
-
-```json
-"imageMaxDimensionPx": 800
-```
-
-Bilder werden vor dem API-Call auf 800px skaliert. Für OCR-intensive Aufgaben auf 1200 erhöhen.
-
-### 5. Kompakter Bootstrap (spart 5–15 % pro Call)
+### 4. Kompakter Bootstrap (spart 5–15 % pro Call)
 
 ```json
 "bootstrapMaxChars": 8000,
@@ -143,7 +148,7 @@ Bilder werden vor dem API-Call auf 800px skaliert. Für OCR-intensive Aufgaben a
 
 Der System-Prompt wird auf das Nötigste begrenzt. Standard-Werte sind 20.000 / 150.000 Zeichen.
 
-### 6. Compaction im Safeguard-Modus
+### 5. Compaction im Safeguard-Modus
 
 ```json
 "compaction": { "mode": "safeguard" }

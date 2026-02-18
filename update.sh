@@ -383,7 +383,6 @@ PATCH_JSON='{
         "suppressToolErrorWarnings": true,
         "prompt": "Lies HEARTBEAT.md, falls vorhanden. Fuehre nur aus, was dort steht. Antworte mit NO_REPLY, wenn keine Aktion noetig."
       },
-      "imageMaxDimensionPx": 800,
       "bootstrapMaxChars": 8000,
       "bootstrapTotalMaxChars": 40000,
       "maxConcurrent": 2,

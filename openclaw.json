@@ -74,10 +74,6 @@
       //   "prompt": "Status-Check. Antworte mit NO_REPLY, wenn nichts zu tun."
       // },
 
-      // ── Bilder / Vision ─────────────────────────────────────────────────────
-      // Niedrigerer Wert → weniger Vision-Tokens. Nur erhöhen, wenn OCR nötig.
-      "imageMaxDimensionPx": 800,
-
       // ── Bootstrap-Dateien ───────────────────────────────────────────────────
       // Begrenzt die Größe des injiziertem System-Prompts.
       // Je kleiner bootstrapMaxChars, desto weniger Input-Tokens pro Call.
