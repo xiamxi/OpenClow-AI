@@ -13,7 +13,7 @@ WORKSPACE_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/workspace"
 echo "==> OpenClaw VPS Setup startet..."
 
 # ── 1. Node.js (>= 20) ────────────────────────────────────────────────────────
-if ! command -v node &>/dev/null || [[ "$(node -e 'process.exit(+process.versions.node.split(".")[0] < 20)')" ]]; then
+if ! command -v node &>/dev/null || [[ "$(node -v | cut -d. -f1 | tr -d 'v')" -lt 20 ]]; then
   echo "--> Node.js 22 LTS installieren..."
   curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
   sudo apt-get install -y nodejs

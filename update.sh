@@ -285,12 +285,12 @@ AGENTS_TARGET="$WORKSPACE_DIR/AGENTS.md"
 HEARTBEAT_TARGET="$WORKSPACE_DIR/HEARTBEAT.md"
 
 build_manifest() {
-  local config_existed=true   # Config muss existieren (oben geprüft)
-  local agents_existed=false
-  local heartbeat_existed=false
+  local config_existed=True   # Config muss existieren (oben geprüft)
+  local agents_existed=False
+  local heartbeat_existed=False
 
-  [[ -f "$AGENTS_TARGET"    ]] && agents_existed=true
-  [[ -f "$HEARTBEAT_TARGET" ]] && heartbeat_existed=true
+  [[ -f "$AGENTS_TARGET"    ]] && agents_existed=True
+  [[ -f "$HEARTBEAT_TARGET" ]] && heartbeat_existed=True
 
   # Manifest-JSON bauen
   python3 - <<MANIFEST_PY

@@ -69,7 +69,7 @@ chmod +x update.sh
 | `./oc-update.sh --dry-run` | Vorschau – keine Änderungen |
 | `./oc-update.sh --no-restart` | Update ohne Dienst-Neustart |
 | `./oc-update.sh --rollback` | Letztes Update rückgängig machen |
-| `./oc-update.sh --rollback 20240218123456` | Bestimmten Snapshot wiederherstellen |
+| `./oc-update.sh --rollback 20260218143000` | Bestimmten Snapshot wiederherstellen |
 | `./oc-update.sh --list-rollbacks` | Alle Snapshots mit Datum anzeigen |
 | `./oc-update.sh --rollback --dry-run` | Rollback-Vorschau ohne Änderungen |
 
