@@ -1,0 +1,110 @@
+// OpenClaw VPS-optimierte Konfiguration
+// Ziel: 60–77% Tokenkosten einsparen
+// Basiert auf: https://docs.openclaw.ai/reference/token-use
+// und:         https://docs.openclaw.ai/gateway/configuration-reference
+{
+  "gateway": {
+    // SICHERHEIT: Nur loopback – niemals 0.0.0.0 auf einem VPS!
+    "bind": "loopback",
+    "port": 4000
+  },
+
+  "agents": {
+    "defaults": {
+      // ── Modell-Routing ──────────────────────────────────────────────────────
+      // Strategie: Sonnet als Standard, Haiku für einfache Aufgaben,
+      //            Opus nur bei explizitem Bedarf.
+      // → spart 50–70 % gegenüber reinem Opus-Betrieb
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-5",
+        "fallbacks": [
+          "anthropic/claude-haiku-4-5",
+          "openrouter/openrouter/auto"
+        ]
+      },
+      // Aliases: Damit /model haiku im Chat funktioniert
+      "models": {
+        "anthropic/claude-haiku-4-5":  { "alias": "haiku"  },
+        "anthropic/claude-sonnet-4-5": { "alias": "sonnet" },
+        "anthropic/claude-opus-4-6":   { "alias": "opus"   }
+      },
+
+      // ── Context-Pruning ─────────────────────────────────────────────────────
+      // Sessionen werden nach Ablauf der Cache-TTL gestutzt, damit der
+      // Kontext nicht unbegrenzt wächst. → spart 40–60 % pro Request
+      "contextPruning": {
+        "mode": "cache-ttl",
+        "ttl": "1h"
+      },
+
+      // ── Compaction (Safeguard-Modus) ────────────────────────────────────────
+      // Fasst lange Historien in Chunks zusammen, bevor das Kontextfenster
+      // voll läuft. memoryFlush schreibt wichtige Infos in MEMORY.md.
+      "compaction": {
+        "mode": "safeguard",
+        "reserveTokensFloor": 24000,
+        "memoryFlush": {
+          "enabled": true,
+          "softThresholdTokens": 6000,
+          "systemPrompt": "Session nähert sich dem Limit. Wichtige Infos jetzt sichern.",
+          "prompt": "Schreibe alle dauerhaften Notizen nach memory/YYYY-MM-DD.md; antworte mit NO_REPLY, wenn nichts zu speichern ist."
+        }
+      },
+
+      // ── Heartbeat ───────────────────────────────────────────────────────────
+      // Heartbeat auf günstigstes Modell routen – oder auf lokales Ollama
+      // (dann 0 Tokenkosten für Heartbeats, ~$50/Monat Ersparnis).
+      //
+      // Option A (Haiku, günstig):
+      "heartbeat": {
+        "every": "55m",
+        "model": "anthropic/claude-haiku-4-5",
+        "includeReasoning": false,
+        "ackMaxChars": 200,
+        "suppressToolErrorWarnings": true,
+        "prompt": "Lies HEARTBEAT.md, falls vorhanden. Führe nur aus, was dort steht. Antworte mit NO_REPLY, wenn keine Aktion nötig."
+      },
+      //
+      // Option B (lokales Ollama, kostenlos) – kommentiere A aus und nutze:
+      // "heartbeat": {
+      //   "every": "55m",
+      //   "model": "ollama/llama3.2:3b",
+      //   "includeReasoning": false,
+      //   "ackMaxChars": 150,
+      //   "prompt": "Status-Check. Antworte mit NO_REPLY, wenn nichts zu tun."
+      // },
+
+      // ── Bilder / Vision ─────────────────────────────────────────────────────
+      // Niedrigerer Wert → weniger Vision-Tokens. Nur erhöhen, wenn OCR nötig.
+      "imageMaxDimensionPx": 800,
+
+      // ── Bootstrap-Dateien ───────────────────────────────────────────────────
+      // Begrenzt die Größe des injiziertem System-Prompts.
+      // Je kleiner bootstrapMaxChars, desto weniger Input-Tokens pro Call.
+      "bootstrapMaxChars": 8000,
+      "bootstrapTotalMaxChars": 40000,
+
+      // ── Parallelität ────────────────────────────────────────────────────────
+      "maxConcurrent": 2,
+      "subagents": {
+        "maxConcurrent": 4
+      }
+    },
+
+    // ── Agenten-Liste ──────────────────────────────────────────────────────────
+    // Jeder Agent kann defaults.model überschreiben.
+    // Einfache Aufgaben → Haiku; komplexe Analysen → Sonnet/Opus
+    "list": [
+      {
+        "id": "main",
+        "label": "Haupt-Agent (Sonnet)",
+        "model": { "primary": "anthropic/claude-sonnet-4-5" }
+      },
+      {
+        "id": "quick",
+        "label": "Schnell-Agent (Haiku)",
+        "model": { "primary": "anthropic/claude-haiku-4-5" }
+      }
+    ]
+  }
+}
